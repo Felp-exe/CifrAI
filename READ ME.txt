@@ -1,0 +1,224 @@
+==============================================================================
+ CifrAI - controle financeiro pessoal a partir do extrato em PDF
+==============================================================================
+
+ Aluno(a): ____________________________________
+ Disciplina / Professor(a): ____________________
+ Link do site (sem login):  https://felp-exe.github.io/CifrAI/
+ Repositorio com todos os arquivos: https://github.com/Felp-exe/CifrAI
+
+
+------------------------------------------------------------------------------
+ 1. O PROBLEMA
+------------------------------------------------------------------------------
+Muita gente nao sabe para onde vai o proprio dinheiro. O extrato do banco traz
+todas as movimentacoes, mas em uma lista longa e sem organizacao: fica dificil
+saber quanto foi gasto com alimentacao, transporte ou saude, se o orcamento do
+mes esta estourando ou onde e possivel economizar.
+
+As ferramentas que resolvem isso costumam exigir cadastro, ligacao com a conta
+bancaria ou envio dos dados para servidores de terceiros, o que afasta quem se
+preocupa com privacidade.
+
+
+------------------------------------------------------------------------------
+ 2. A IDEIA
+------------------------------------------------------------------------------
+O CifrAI e um site que roda inteiro no navegador. A pessoa envia o extrato do
+banco em PDF, o site le as movimentacoes, sugere uma categoria para cada gasto
+e mostra, em graficos simples, para onde o dinheiro foi.
+
+Principios do projeto:
+  - Sem login, sem cadastro, sem servidor e sem banco de dados online.
+  - Os PDFs sao lidos no proprio navegador e nunca sao enviados a lugar nenhum.
+  - Nada e salvo sem a pessoa revisar antes (tela de revisao da importacao).
+  - O sistema nunca inventa dados: o que nao da para identificar com seguranca
+    fica pendente para a pessoa decidir.
+  - O que o usuario corrige manualmente nunca e sobrescrito automaticamente.
+
+
+------------------------------------------------------------------------------
+ 3. COMO USAR (PARA QUEM VAI TESTAR)
+------------------------------------------------------------------------------
+ 1) Abra o link do site.
+ 2) Na tela inicial clique em "Testar com um extrato de exemplo" (dados
+    ficticios que vem junto com o site) ou em "Comecar agora" para enviar o seu
+    proprio extrato em PDF (baixado do app ou do site do banco, com texto; PDFs
+    escaneados nao sao suportados).
+ 3) Na tela de revisao confira as transacoes e clique em "Salvar".
+ 4) Veja o Painel (resumo e graficos), ajuste categorias em Transacoes, crie
+    Orcamentos e converse com o Assistente.
+ 5) Para limpar tudo depois do teste: Ajustes > "Excluir importacao" (apaga so
+    um extrato) ou "Apagar todos os dados".
+
+Os dados de cada pessoa ficam apenas no navegador dela. Quem testa nao ve os
+dados de ninguem e ninguem ve os dele.
+
+
+------------------------------------------------------------------------------
+ 4. O QUE O SISTEMA FAZ
+------------------------------------------------------------------------------
+ INICIO         Explica o site, como comecar e permite testar com um extrato de
+                exemplo.
+ IMPORTAR       Le o PDF, interpreta as linhas (data + descricao + valor em
+                R$), identifica entrada ou saida, detecta possiveis duplicadas
+                e mostra tudo em uma tela de revisao com avisos. So salva
+                depois da confirmacao. O periodo do extrato e lido do
+                cabecalho do PDF (ou das datas das transacoes).
+ TRANSACOES     Lista com busca e filtros. Cada gasto recebe uma categoria
+                automatica; a pessoa pode corrigir (individual ou em lote),
+                confirmar sugestoes, criar categorias novas e criar regras
+                proprias (o sistema pode memorizar cada correcao como regra).
+ ORCAMENTO      Limite mensal por categoria, com percentual usado, restante e
+                alertas (atencao a partir de 80%, excedido acima de 100%).
+ CICLOS         Fontes de renda (mensal, quinzenal, semanal ou unica) e
+                acompanhamento de cada recebimento previsto x recebido, com
+                alocacao das despesas aos ciclos (automatica, para o proximo
+                ciclo ou manual).
+ PAINEL         Receitas, despesas, saldo do periodo, despesas pendentes e
+                graficos: receitas x despesas, por categoria, evolucao do
+                saldo, evolucao dos gastos e orcamento. Mostra tambem insights
+                calculados com os dados (sem inteligencia artificial).
+ ASSISTENTE     Responde perguntas sobre os gastos (ver secao 6).
+ AJUSTES        Backup (exportar e restaurar, com validacao e confirmacao),
+                excluir uma importacao, apagar todos os dados e informacoes de
+                privacidade.
+
+
+------------------------------------------------------------------------------
+ 5. A LOGICA (COMO AS DECISOES SAO TOMADAS)
+------------------------------------------------------------------------------
+ LEITURA DO EXTRATO
+  - O texto do PDF e extraido pelo PDF.js, linha a linha.
+  - Cada linha precisa de data no inicio e valor em formato brasileiro. O
+    primeiro valor da linha e o da movimentacao; os demais costumam ser saldo
+    (a pessoa e avisada). Linhas de "saldo" nao viram transacao.
+  - Entrada ou saida: sinal ou C/D do valor, depois palavras da descricao
+    (ex.: "recebido", "enviado"). Se nao der para saber, a linha fica
+    bloqueada ate a pessoa escolher.
+  - Linhas sem ano usam o periodo do cabecalho; sem isso a pessoa informa o ano.
+  - Duplicadas sao detectadas por uma "impressao digital" (data + valor + nome).
+  - Todos os valores sao guardados em centavos inteiros (sem erro de
+    arredondamento) e as datas como texto AAAA-MM-DD (sem fuso horario).
+
+ CATEGORIZACAO (por regras, nesta ordem de prioridade)
+  1. Regras do usuario vencem as regras iniciais.
+  2. Dentro de cada grupo vence a regra mais especifica: nome exato, depois o
+     texto mais longo (ex.: "99 pop" vence "99"; "academia esportiva" vence
+     "academia").
+  3. A comparacao ignora maiusculas, acentos e numeros extras, e palavras curtas
+     so valem inteiras (UBER nao confunde com UBERABA).
+  4. Se nada casar exatamente, tenta uma correspondencia aproximada (uma letra
+     diferente) e deixa a transacao PENDENTE com a sugestao.
+  5. Sem regra: entrada nao recebe categoria de gasto; saida desconhecida vai
+     para "Outros" como pendente.
+  6. "99" sozinho nunca e classificado: pode ser Pop, Food ou Negocia.
+  - Existem 18 categorias iniciais (Alimentacao, Transporte, Moradia, Compras,
+    Entretenimento, Saude, Assinaturas, Educacao, Familia, Esporte, Dizimo,
+    Pets, Cuidados pessoais, Servicos, Taxas e tarifas, Presentes, Viagens e
+    Outros) e uma lista de palavras-chave para cada uma. A pessoa cria outras.
+
+ ORCAMENTO E CICLOS
+  - Gasto do mes = saidas com categoria menos estornos da mesma categoria.
+  - Ciclo = um recebimento previsto (ex.: salario dia 5). "Previsto" e quanto a
+    renda deveria pagar, "Recebido" e o que realmente entrou. Esses numeros sao
+    planejados com base nos dados importados e nao sao o saldo do banco.
+
+
+------------------------------------------------------------------------------
+ 6. AGENTE E SKILLS
+------------------------------------------------------------------------------
+O Assistente foi construido com uma arquitetura pronta para receber uma IA
+generativa real (LLM) no futuro, sem nunca colocar chaves de API no navegador.
+Hoje ele funciona em MODO LOCAL, sem IA generativa: entende a pergunta por
+regras e responde com calculos feitos nos dados da propria pessoa. A tela do
+Assistente diz claramente em que modo esta.
+
+ Quatro skills (cada uma com um arquivo SKILL.md na pasta "skills"):
+   1. categorizacao             - classificar e corrigir categorias
+   2. analise-financeira        - resumos, comparacoes e tendencias
+   3. monitoramento-orcamento   - uso dos orcamentos e alertas
+   4. ciclos-recebimento        - recebimentos previstos x recebidos
+
+ Seguranca do agente:
+   - As ferramentas do agente so LEEM os dados (uma "fotografia" congelada).
+   - Os parametros sao validados; ferramentas ou campos inventados sao recusados.
+   - Qualquer alteracao sugerida (ex.: categorizar varias transacoes) vira uma
+     PROPOSTA que so e aplicada quando a pessoa clica; um clique simulado por
+     codigo e ignorado.
+   - O contrato para ligar um LLM por um backend seguro esta descrito em
+     docs/API-BACKEND.md e docs/CONFIGURAR-LLM.md. Nenhum backend existe ainda.
+
+ Documentos tecnicos: docs/AGENTE.md, docs/FERRAMENTAS.md, docs/API-BACKEND.md,
+ docs/CONFIGURAR-LLM.md e docs/BACKUP.md.
+
+
+------------------------------------------------------------------------------
+ 7. COMO FOI CONSTRUIDO (PARTE TECNICA)
+------------------------------------------------------------------------------
+ - HTML, CSS e JavaScript puros (modulos ES), sem etapa de build e sem framework.
+ - PDF.js 4.10.38 (leitura de PDF) e Chart.js 4.4.7 (graficos), copiados para a
+   pasta "lib" (funciona sem depender de internet).
+ - IndexedDB: transacoes, categorias, regras, orcamentos, rendas, alocacoes,
+   vinculos de recebimento e historico de importacoes.
+ - LocalStorage: preferencias pequenas (filtro do painel, modo do assistente).
+ - Navegacao por "#" (ex.: #/painel), que funciona em qualquer hospedagem de
+   site estatico (aqui, GitHub Pages).
+ - Visual responsivo (menu lateral no computador, menu inferior no celular),
+   cores pastel, modo claro e escuro automaticos.
+ - Acessibilidade: navegacao por teclado, rotulos em campos e botoes, graficos
+   com tabela de dados equivalente e contraste de texto conferido por auditoria
+   automatica nos dois temas (nenhuma falha encontrada).
+
+ Estrutura de pastas:
+   index.html          pagina unica do app
+   css/                estilos
+   js/                 codigo (db, pdf, import, categorization, budget, cycles,
+                       dashboard, charts, agent, backup, ui)
+   data/               categorias e regras iniciais (JSON)
+   lib/                PDF.js e Chart.js (com suas licencas)
+   samples/            extratos de exemplo ficticios
+   skills/             as 4 skills (SKILL.md)
+   docs/               documentacao tecnica
+   tests/              testes automaticos
+
+ Testes: abra tests/tests.html pelo servidor (por exemplo
+ http://localhost:8080/tests/tests.html). Sao mais de 220 testes automaticos
+ (leitura de PDF, categorizacao, orcamentos, ciclos, painel, agente, backup,
+ limpeza de dados e telas). Observacao: abrir os arquivos direto do computador
+ (file://) nao funciona; e preciso um servidor, como o do GitHub Pages ou o
+ arquivo "iniciar.bat" (precisa de Python instalado).
+
+
+------------------------------------------------------------------------------
+ 8. RESULTADO ESPERADO
+------------------------------------------------------------------------------
+Que qualquer pessoa consiga, em poucos minutos e sem criar conta, transformar o
+extrato do banco em uma visao clara dos proprios gastos: categorias, graficos,
+orcamentos por categoria e respostas a perguntas simples, mantendo todos os
+dados apenas no seu proprio navegador.
+
+
+------------------------------------------------------------------------------
+ 9. LIMITACOES CONHECIDAS
+------------------------------------------------------------------------------
+ - Le apenas PDFs com texto (sem OCR) e um formato generico de extrato
+   (data + descricao + valor). Bancos com layout muito diferente podem exigir
+   um novo leitor.
+ - Nao le o saldo da conta: o "saldo do periodo" e receitas menos despesas dos
+   extratos importados, nao o saldo real do banco.
+ - O assistente e local e sem IA generativa; nao mantem contexto de conversa.
+   A ligacao com um LLM real nao foi contratada nem configurada.
+ - Os dados ficam so no navegador: limpar os dados do site ou trocar de
+   computador os apaga. Por isso existe o backup (arquivo JSON, sem
+   criptografia: guarde em local seguro).
+ - Testado no Chrome/Edge. Firefox e Safari nao foram testados, e a
+   acessibilidade nao foi validada com leitores de tela reais.
+ - Nao substitui orientacao financeira profissional.
+
+
+------------------------------------------------------------------------------
+ 10. LICENCAS DE TERCEIROS
+------------------------------------------------------------------------------
+ PDF.js (Mozilla) - licenca Apache 2.0  (lib/pdfjs/LICENSE)
+ Chart.js         - licenca MIT         (lib/chartjs/LICENSE.md)
