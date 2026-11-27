@@ -15,6 +15,7 @@ Site: https://felp-exe.github.io/CifrAI/
 - **Importação de extrato em PDF** lido no próprio navegador (PDF.js), com tela de revisão antes de salvar: tipo, entrada/saída, valor, data e avisos por linha, detecção de possíveis duplicadas e opção de informar o ano quando o extrato não traz.
 - **Categorização automática** por regras (iniciais e do usuário), com correção manual individual ou em lote, confirmação de sugestões, memorização de correções como regras e proteção das correções manuais.
 - **Categorias editáveis**: 18 categorias iniciais; criação, edição e exclusão de categorias próprias (a exclusão move as transações para outra categoria), inclusive direto da lista de transações e do orçamento pela opção "+ Nova categoria…".
+- **Desfazer e Recentes**: depois de classificar, o botão **Desfazer** devolve as transações (e remove a regra memorizada) ao estado anterior; a aba **Recentes** lista o que a pessoa classificou por último, com opção de trocar a categoria ou **devolver para a Revisão**.
 - **Regras do usuário** com tipo de comparação (exato, começa com, palavra inteira, contém), ativação/desativação e prioridade sobre as regras iniciais.
 - **Orçamentos mensais por categoria**, com gasto, restante, percentual e alertas.
 - **Ciclos de recebimento**: fontes de renda (mensal, quinzenal, semanal ou única), recebimentos previstos x recebidos, alocação de despesas aos ciclos (automática, para o próximo recebimento ou manual) e lista de despesas sem alocação.

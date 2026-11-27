@@ -10,7 +10,9 @@ import * as orcamento from '../js/ui/orcamento.js';
 import * as ciclos from '../js/ui/ciclos.js';
 import * as assistente from '../js/ui/assistente.js';
 import * as configuracoes from '../js/ui/configuracoes.js';
-import { recategorize, setCategory } from '../js/categorization/transactionService.js';
+import {
+  recategorize, setCategory, takeUndoSnapshot, restoreUndoSnapshot, sendBackToReview,
+} from '../js/categorization/transactionService.js';
 import { createBudget } from '../js/budget/budgetService.js';
 import { createSource } from '../js/cycles/incomeService.js';
 
@@ -161,6 +163,114 @@ async function waitForDialog(predicate = () => true) {
   }
 }
 const clearDialogs = () => document.querySelectorAll('dialog.dialog').forEach((d) => d.remove());
+
+test('Desfazer (serviço): a fotografia restaura transações e remove a regra memorizada, sem tocar no resto', async () => {
+  const db = await newDb();
+  const add = (desc, date) => db.add('transactions', {
+    date, amount: -5000, type: 'compra', originalDescription: desc, normalizedName: normalizeText(desc),
+    categoryId: null, status: 'pendente', fingerprint: `u${counter++}`, importId: 'i',
+  });
+  const a = await add('LOJA DO ARNALDO', '2026-03-01');
+  const b = await add('LOJA DO ARNALDO', '2026-03-02');
+  const c = await add('ZZQ COMERCIO TESTE', '2026-03-03');
+  await recategorize(db);
+  const before = JSON.stringify(await db.getAll('transactions'));
+  const rulesBefore = (await db.getAll('rules')).length;
+
+  const snapshot = await takeUndoSnapshot(db);
+  await setCategory(db, [a], 'compras', { remember: true }); // cria regra e reclassifica a outra "LOJA DO ARNALDO"
+  assertEqual((await db.get('transactions', a)).manual, true);
+  assertEqual((await db.get('transactions', b)).categoryId, 'compras', 'a regra memorizada reclassificou a outra:');
+  assertEqual((await db.getAll('rules')).length, rulesBefore + 1, 'regra criada:');
+
+  const result = await restoreUndoSnapshot(db, snapshot);
+  assert(result.transactions >= 2 && result.rules === 1, `restaurou ${result.transactions} transações e ${result.rules} regra(s)`);
+  assertEqual(JSON.stringify(await db.getAll('transactions')), before, 'transações idênticas às de antes:');
+  assertEqual((await db.getAll('rules')).length, rulesBefore, 'regra memorizada removida:');
+  assertEqual((await db.get('transactions', c)).status, 'pendente', 'o que não foi tocado continua igual:');
+  assertEqual((await restoreUndoSnapshot(db, snapshot)).transactions, 0, 'desfazer de novo não muda nada:');
+  db.close(); await deleteDatabase(db._testName);
+});
+
+test('Devolver para revisão (serviço): tira a proteção manual e volta a ser pendente, mantendo a categoria', async () => {
+  const db = await newDb();
+  const id = await db.add('transactions', {
+    date: '2026-03-01', amount: -3000, type: 'compra', originalDescription: 'ALGO QUALQUER', normalizedName: 'algo qualquer',
+    categoryId: null, status: 'pendente', fingerprint: `d${counter++}`, importId: 'i',
+  });
+  await setCategory(db, [id], 'saude');
+  assertEqual((await db.get('transactions', id)).manual, true);
+  assertEqual(await sendBackToReview(db, [id]), 1);
+  const tx = await db.get('transactions', id);
+  assertEqual(tx.manual, false);
+  assertEqual(tx.status, 'pendente');
+  assertEqual(tx.categoryId, 'saude', 'a categoria atual fica para você conferir:');
+  assertEqual(tx.suggestedCategoryId, 'saude', 'e vira a sugestão (dá para só confirmar):');
+  assertEqual(tx.amount, -3000, 'valor intacto:');
+  assertEqual(tx.originalDescription, 'ALGO QUALQUER', 'descrição original intacta:');
+  db.close(); await deleteDatabase(db._testName);
+});
+
+test('Revisão: classificar mostra o botão "Desfazer" e ele devolve a transação ao estado anterior (e à pendência)', async () => {
+  clearDialogs();
+  const db = await newDb();
+  await withData(db);
+  const pendBefore = (await db.getAll('transactions')).filter((t) => t.status === 'pendente');
+  assert(pendBefore.length > 0, 'há pendências');
+  const view = await renderRoute(transacoes, db, 'revisao');
+  try {
+    assertEqual(view.querySelector('#review-count').textContent, String(pendBefore.length));
+    const row = view.querySelector('.tx-table tbody tr');
+    const id = Number(row.dataset.id);
+    const select = row.querySelector('.f-cat');
+    select.value = 'alimentacao'; select.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(400);
+    assertEqual(view.querySelector('#review-count').textContent, String(pendBefore.length - 1), 'saiu da Revisão:');
+    assertEqual((await db.get('transactions', id)).manual, true);
+    const undo = view.querySelector('#msg [data-act="undo"]');
+    assert(undo, 'o aviso mostra o botão Desfazer');
+    undo.click();
+    await sleep(400);
+    const tx = await db.get('transactions', id);
+    assertEqual(tx.status, 'pendente', 'voltou a ser pendente:');
+    assert(!tx.manual, 'e deixou de ser correção manual');
+    assertEqual(view.querySelector('#review-count').textContent, String(pendBefore.length), 'contador voltou:');
+    assert(/desfeita/.test(view.querySelector('#msg').textContent), 'mensagem de confirmação');
+    assert(!view.querySelector('#msg [data-act="undo"]'), 'o botão some depois de usado');
+  } finally { view.remove(); db.close(); await deleteDatabase(db._testName); }
+});
+
+test('Aba Recentes: lista o que você classificou, da mais recente para a mais antiga, e permite devolver para revisão', async () => {
+  clearDialogs();
+  const db = await newDb();
+  await withData(db); // já tem 1 correção manual (LOJA XPTO)
+  const all = await db.getAll('transactions');
+  const app99 = all.find((t) => /99 APP/.test(t.originalDescription));
+  await sleep(15);
+  await setCategory(db, [app99.id], 'transporte'); // a mais recente
+  const view = await renderRoute(transacoes, db, 'recentes');
+  try {
+    assert([...view.querySelectorAll('.tab')].some((t) => t.textContent.trim().startsWith('Recentes')), 'a aba existe');
+    const rows = [...view.querySelectorAll('.tx-table tbody tr')];
+    assertEqual(rows.length, 2, 'duas classificações suas:');
+    assertEqual(Number(rows[0].dataset.id), app99.id, 'a mais recente vem primeiro:');
+    assert(/Classificada por você em/.test(rows[0].textContent), 'mostra quando foi classificada');
+    assert(!view.querySelector('#f-status'), 'sem filtro de situação nesta aba');
+    // devolver para revisão
+    rows[0].querySelector('[data-act="to-review"]').click();
+    await sleep(400);
+    assertEqual(view.querySelectorAll('.tx-table tbody tr').length, 1, 'saiu de Recentes:');
+    const tx = await db.get('transactions', app99.id);
+    assertEqual(tx.status, 'pendente', 'voltou para a Revisão:');
+    assert(!tx.manual, 'sem proteção manual');
+  } finally { view.remove(); db.close(); await deleteDatabase(db._testName); }
+
+  // sem classificações suas, a aba explica
+  const db2 = await newDb();
+  await db2.add('transactions', { date: '2026-03-01', amount: -1000, type: 'compra', originalDescription: 'IFOOD', normalizedName: 'ifood', categoryId: 'alimentacao', status: 'classificada', fingerprint: 'r1', importId: 'i' });
+  const v2 = await renderRoute(transacoes, db2, 'recentes');
+  try { assert(/Você ainda não classificou nada/.test(v2.querySelector('#list-area').textContent), 'estado vazio claro'); } finally { v2.remove(); db2.close(); await deleteDatabase(db2._testName); }
+});
 
 /** Preenche e envia a janela "Nova categoria" (ou cancela, se name for null) e espera ela fechar. */
 async function answerNewCategoryDialog(name, color = '#336699') {

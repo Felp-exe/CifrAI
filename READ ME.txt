@@ -69,6 +69,10 @@ dados de ninguem e ninguem ve os dele.
                 automatica; a pessoa pode corrigir (individual ou em lote),
                 confirmar sugestoes, criar categorias novas e criar regras
                 proprias (o sistema pode memorizar cada correcao como regra).
+                Depois de cada classificacao ha um botao Desfazer, e a aba
+                Recentes mostra o que a pessoa classificou por ultimo (da mais
+                recente para a mais antiga), para trocar a categoria ou devolver
+                a transacao para a Revisao.
  ORCAMENTO      Limite mensal por categoria, com percentual usado, restante e
                 alertas (atencao a partir de 80%, excedido acima de 100%).
  CICLOS         Fontes de renda (mensal, quinzenal, semanal ou unica) e
