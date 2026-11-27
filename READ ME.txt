@@ -2,8 +2,8 @@
  CifrAI - controle financeiro pessoal a partir do extrato em PDF
 ==============================================================================
 
- Aluno(a): ____________________________________
- Disciplina / Professor(a): ____________________
+ Aluno(a): Felipe Garcia Fausto	__________________________________
+ Disciplina / Professor(a): Diego Senise___________________
  Link do site (sem login):  https://felp-exe.github.io/CifrAI/
  Repositorio com todos os arquivos: https://github.com/Felp-exe/CifrAI
 

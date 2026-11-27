@@ -118,7 +118,12 @@ test('Tela inicial: explica o site, tem botões para começar e passa na auditor
   try {
     assertEqual(view.querySelectorAll('h1').length, 1, 'um título principal:');
     const headings = [...view.querySelectorAll('h2')].map((h) => h.textContent.trim());
-    for (const h of ['Como funciona', 'O que você encontra aqui', 'Seus dados ficam só com você']) assert(headings.includes(h), `faltou a seção "${h}"`);
+    for (const h of ['Antes de começar', 'Como funciona', 'O que você encontra aqui', 'Seus dados ficam só com você']) assert(headings.includes(h), `faltou a seção "${h}"`);
+    const aviso = view.querySelector('.before-band').textContent;
+    assert(/projeto acadêmico/.test(aviso) && /só no seu navegador/.test(aviso), 'aviso: projeto acadêmico e dados só no navegador');
+    assert(/extrato de exemplo/.test(aviso), 'aviso: testar com o extrato de exemplo primeiro');
+    assert(/público ou compartilhado/.test(aviso) && /Apagar todos os dados/.test(aviso), 'aviso: não usar em computador público e apagar os dados');
+    assert(view.querySelector('.before-band a[href="#/configuracoes"]'), 'aviso leva para Ajustes');
     assertEqual(view.querySelectorAll('.step').length, 3, 'três passos:');
     assertEqual(view.querySelectorAll('.feature').length, 6, 'seis recursos:');
     assert(view.querySelectorAll('a[href="#/importar"]').length >= 2, 'botões "começar" levam à importação');

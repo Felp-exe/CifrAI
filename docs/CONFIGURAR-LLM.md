@@ -45,6 +45,7 @@ export default {
 Origem permitida (CORS) = o endereço do seu site; limite de requisições; limite de tamanho; sem logs com dados financeiros. Veja o checklist em `docs/API-BACKEND.md`.
 
 ### 5. Conecte no app
+0. **Libere o endereço na regra de segurança.** O `index.html` tem uma regra (Content-Security-Policy) com `connect-src 'self'`, que só deixa o app falar com o próprio site. Troque por `connect-src 'self' https://seu-backend.exemplo.com` (o endereço exato do seu backend, nunca `https:` inteiro) e publique o arquivo de novo. Sem isso o navegador bloqueia a conexão e o assistente continua no modo local.
 1. Abra a aba **Assistente** → **Configurações do assistente**.
 2. Cole o endereço do backend (`https://...`, sem `?parâmetros`) e clique em **Salvar endereço**.
 3. Clique em **Testar conexão**. Deve aparecer "Backend respondeu" com o provedor/modelo.
