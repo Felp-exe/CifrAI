@@ -262,6 +262,8 @@ class SettingsView {
       <ul class="plain-list">
         <li>Sem login, sem cadastro e sem banco de dados online: tudo fica no <strong>IndexedDB deste navegador</strong>.</li>
         <li>Os PDFs são lidos no seu navegador e <strong>não são enviados</strong> a lugar nenhum.</li>
+        <li>Os dados não são criptografados: <strong>quem usar este mesmo navegador no mesmo computador consegue vê-los</strong>. Em computador compartilhado ou público, use "Apagar todos os dados" ao terminar.</li>
+        <li>O site só carrega e executa código dele mesmo (regra de segurança do navegador), e este é um projeto acadêmico, sem auditoria de segurança independente.</li>
         <li>Assistente: ${cfg.effectiveMode === 'llm'
           ? 'IA conectada — resultados resumidos das consultas vão ao seu backend de IA (veja a faixa na tela do Assistente).'
           : 'modo local, sem IA generativa; nenhuma pergunta sai do navegador.'} <a href="#/assistente">Abrir o Assistente</a>.</li>

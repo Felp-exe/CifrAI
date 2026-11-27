@@ -50,6 +50,15 @@ export async function render(container, ctx) {
         </div>
       </section>
 
+      <section class="before-band" aria-labelledby="before-title">
+        <h2 id="before-title">Antes de começar</h2>
+        <ul class="before-list">
+          <li><strong>Este é um projeto acadêmico.</strong> Seus dados ficam só no seu navegador: não são enviados para nenhum servidor.</li>
+          <li><strong>Primeira vez por aqui?</strong> Teste com o extrato de exemplo (dados fictícios) antes de usar o seu.</li>
+          <li><strong>Não use em computador público ou compartilhado.</strong> Se precisar, apague seus dados no final em <a href="#/configuracoes">Ajustes › Apagar todos os dados</a>.</li>
+        </ul>
+      </section>
+
       <section class="home-section" aria-labelledby="how-title">
         <h2 id="how-title">Como funciona</h2>
         <p class="lead">Três passos, sem instalar nada e sem criar conta.</p>

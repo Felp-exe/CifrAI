@@ -64,7 +64,8 @@ class ImportView {
           <input type="file" id="file-input" accept="application/pdf,.pdf" hidden>
         </label>
         <p class="hint">O arquivo é lido no seu navegador e <strong>não é enviado para nenhum servidor</strong>.
-        Funciona com PDFs que têm texto (baixados do app ou site do banco). PDFs escaneados não são suportados.</p>
+        Funciona com PDFs que têm texto (baixados do app ou site do banco). PDFs escaneados não são suportados.
+        Em computador compartilhado ou público, apague seus dados ao terminar (<a href="#/configuracoes">Ajustes</a>).</p>
         <div class="sample-box">
           <span class="muted">Sem um extrato à mão? Veja como funciona com dados fictícios.</span>
           <button class="btn" type="button" id="sample-btn">Usar extrato de exemplo</button>

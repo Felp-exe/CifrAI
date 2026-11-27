@@ -119,6 +119,7 @@ class AssistantView {
             <li>Ao backend vão: o texto da conversa, a lista de ferramentas e os <strong>resultados resumidos</strong> das ferramentas. Nunca PDFs, extratos completos nem o banco de dados.</li>
             <li>O modelo só pode usar ferramentas de <strong>leitura</strong>. Alterar categorias exige o seu clique em "Confirmar".</li>
             <li>Sem backend configurado, a IA não está disponível: o app não finge que ela existe.</li>
+            <li>Uma regra de segurança do site só permite conexões com o próprio site. Para usar um backend de IA, o endereço dele precisa ser liberado no <code>index.html</code> (veja <code>docs/CONFIGURAR-LLM.md</code>).</li>
           </ul>
         </div>
       </div>
