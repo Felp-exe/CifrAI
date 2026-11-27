@@ -7,12 +7,14 @@ import { escapeHtml, formatBRL, formatDate } from '../utils/format.js';
 import { listCategories } from '../categorization/categoryService.js';
 import {
   setCategory, confirmSuggestions, resetToAutomatic, filterTransactions,
+  takeUndoSnapshot, restoreUndoSnapshot, sendBackToReview,
 } from '../categorization/transactionService.js';
 import { getSetting, setSetting } from '../storage.js';
 
 const TABS = [
   { id: '', label: 'Todas' },
   { id: 'revisao', label: 'Revisão' },
+  { id: 'recentes', label: 'Recentes' },
   { id: 'regras', label: 'Regras' },
   { id: 'categorias', label: 'Categorias' },
 ];
@@ -42,7 +44,7 @@ export async function render(container, ctx) {
   const content = container.querySelector('#tab-content');
   if (sub === 'regras') return regras.render(content, ctx);
   if (sub === 'categorias') return categorias.render(content, ctx);
-  const list = new TransactionList(content, ctx, sub === 'revisao' ? 'revisao' : 'todas');
+  const list = new TransactionList(content, ctx, ['revisao', 'recentes'].includes(sub) ? sub : 'todas');
   return list.start();
 }
 
@@ -54,6 +56,7 @@ class TransactionList {
     this.selected = new Set();
     this.limit = PAGE_SIZE;
     this.message = '';
+    this.undo = null; // fotografia para o botão Desfazer (só a última classificação)
     this.txs = [];
     this.categories = [];
   }
@@ -65,7 +68,7 @@ class TransactionList {
         <label class="field grow"><span>Buscar</span>
           <input type="search" id="f-search" placeholder="Estabelecimento ou descrição" value="${escapeHtml(filters.search)}"></label>
         <label class="field"><span>Categoria</span><select id="f-category">${this.categoryFilterOptions()}</select></label>
-        ${this.mode === 'revisao' ? '' : `<label class="field"><span>Situação</span><select id="f-status">
+        ${['revisao', 'recentes'].includes(this.mode) ? '' : `<label class="field"><span>Situação</span><select id="f-status">
           ${[['todas', 'Todas'], ['pendente', 'Pendentes de revisão'], ['classificada', 'Classificadas'], ['manual', 'Corrigidas por você']]
             .map(([v, l]) => `<option value="${v}" ${filters.status === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`}
         <label class="check"><input type="checkbox" id="f-remember" ${getSetting('rememberCorrections') ? 'checked' : ''}>
@@ -92,6 +95,11 @@ class TransactionList {
   }
 
   visible() {
+    if (this.mode === 'recentes') {
+      // o que VOCÊ classificou, da alteração mais recente para a mais antiga
+      return filterTransactions(this.txs, { search: filters.search, category: filters.category, status: 'manual' })
+        .sort((a, b) => String(b.categorizedAt || '').localeCompare(String(a.categorizedAt || '')));
+    }
     const status = this.mode === 'revisao' ? 'pendente' : filters.status;
     return filterTransactions(this.txs, { search: filters.search, category: filters.category, status });
   }
@@ -105,6 +113,7 @@ class TransactionList {
     this.container.querySelector('#f-category').addEventListener('change', (e) => { filters.category = e.target.value; this.limit = PAGE_SIZE; this.draw(); });
     this.container.querySelector('#f-status')?.addEventListener('change', (e) => { filters.status = e.target.value; this.limit = PAGE_SIZE; this.draw(); });
     this.container.querySelector('#f-remember').addEventListener('change', (e) => setSetting('rememberCorrections', e.target.checked));
+    this.container.querySelector('#msg').addEventListener('click', (e) => { if (e.target.closest('[data-act="undo"]')) this.undoLast(); });
 
     const area = this.container.querySelector('#list-area');
     area.addEventListener('change', (e) => this.onChange(e));
@@ -113,10 +122,16 @@ class TransactionList {
 
   get remember() { return this.container.querySelector('#f-remember').checked; }
 
-  say(text) {
+  say(text, { undo = false } = {}) {
     this.message = text;
     const el = this.container.querySelector('#msg');
-    if (el) el.textContent = text;
+    if (!el) return;
+    el.textContent = text;
+    if (undo) {
+      const button = document.createElement('button');
+      button.type = 'button'; button.className = 'btn small'; button.dataset.act = 'undo'; button.textContent = 'Desfazer';
+      el.append(' ', button);
+    }
   }
 
   // ------------------------------------------------------------------ desenho
@@ -136,7 +151,7 @@ class TransactionList {
     if (rows.length === 0) {
       // Os filtros (busca/categoria/situação) ficam guardados entre as abas: se eles escondem tudo,
       // a tela precisa dizer isso (e não "nada para revisar") e oferecer uma saída.
-      const filtering = Boolean(filters.search) || filters.category !== 'todas' || (this.mode !== 'revisao' && filters.status !== 'todas');
+      const filtering = Boolean(filters.search) || filters.category !== 'todas' || (this.mode === 'todas' && filters.status !== 'todas');
       const pendingTotal = this.txs.filter((t) => t.status === 'pendente').length;
       const clear = '<div class="action-buttons center"><button class="btn primary" type="button" data-act="clear-filters">Limpar filtros</button></div>';
       let title; let text; let extra = '';
@@ -147,6 +162,12 @@ class TransactionList {
         title = 'Nenhuma pendência com estes filtros';
         text = `Há ${pendingTotal} transaç${pendingTotal === 1 ? 'ão pendente' : 'ões pendentes'} de revisão, mas nenhuma combina com a busca ou a categoria escolhida.`;
         extra = clear;
+      } else if (this.mode === 'recentes') {
+        title = filtering ? 'Nenhuma alteração sua com estes filtros' : 'Você ainda não classificou nada';
+        text = filtering
+          ? 'Nenhuma transação que você classificou combina com a busca ou a categoria escolhida.'
+          : 'Quando você escolher uma categoria ou confirmar uma sugestão, a transação aparece aqui, da mais recente para a mais antiga. Daqui dá para mudar a categoria ou devolvê-la para a Revisão.';
+        if (filtering) extra = clear;
       } else {
         title = 'Nenhuma transação encontrada';
         text = 'Tente mudar a busca ou os filtros.';
@@ -157,7 +178,9 @@ class TransactionList {
     }
 
     area.innerHTML = `
-      <p class="muted count-line">${rows.length} transaç${rows.length === 1 ? 'ão' : 'ões'}${rows.length > shown.length ? ` (mostrando ${shown.length})` : ''}</p>
+      <p class="muted count-line">${this.mode === 'recentes'
+        ? `${rows.length} classificaç${rows.length === 1 ? 'ão sua' : 'ões suas'}, da mais recente para a mais antiga. Classificou algo por engano? Mude a categoria ou clique em "Devolver para revisão".`
+        : `${rows.length} transaç${rows.length === 1 ? 'ão' : 'ões'}`}${rows.length > shown.length ? ` (mostrando ${shown.length})` : ''}</p>
       <section class="card table-card">
         <table class="review-table tx-table">
           <thead><tr>
@@ -191,9 +214,11 @@ class TransactionList {
           <li class="w ${t.status === 'pendente' ? 'atencao' : 'ok'}"><b>${t.status === 'pendente' ? 'Revisar' : 'Classificada'}</b> · ${SOURCE_LABEL[t.categorySource] || 'Sem classificação'}${t.confidence ? ` · ${CONFIDENCE_LABEL[t.confidence]}` : ''}</li>
           ${suggestion && t.status === 'pendente' ? `<li class="w info">Sugestão: <b>${escapeHtml(suggestion.nome)}</b></li>` : ''}
           ${t.reason ? `<li class="micro">${escapeHtml(t.reason)}</li>` : ''}
+          ${t.manual && t.categorizedAt ? `<li class="micro">Classificada por você em ${escapeHtml(new Date(t.categorizedAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }))}</li>` : ''}
         </ul>
         <div class="row-actions">
           ${canConfirm ? '<button class="btn small" data-act="confirm" type="button">Confirmar</button>' : ''}
+          ${t.manual ? '<button class="btn small" data-act="to-review" type="button">Devolver para revisão</button>' : ''}
           ${t.manual ? '<button class="btn small" data-act="reset" type="button">Voltar ao automático</button>' : ''}
         </div></td>
     </tr>`;
@@ -275,6 +300,10 @@ class TransactionList {
       const id = this.idOf(btn);
       return this.run(() => resetToAutomatic(this.db, [id]), () => 'Voltou para a classificação automática.');
     }
+    if (act === 'to-review') {
+      const id = this.idOf(btn);
+      return this.run(() => sendBackToReview(this.db, [id]), () => 'Devolvida para a Revisão: ela volta a aparecer lá como pendente.');
+    }
     if (act === 'bulk-apply') {
       const category = this.container.querySelector('#bulk-cat').value;
       if (!category || category === NEW_CATEGORY_VALUE) return this.say('Escolha uma categoria para aplicar às selecionadas.');
@@ -290,16 +319,35 @@ class TransactionList {
     }
   }
 
+  /** Executa uma alteração; antes, guarda uma fotografia para o botão "Desfazer" (só a última alteração). */
   async run(action, successMessage, clearSelection = false) {
     try {
+      const snapshot = await takeUndoSnapshot(this.db);
       const result = await action();
+      this.undo = snapshot;
       if (clearSelection) this.selected.clear();
       await this.reload();
       this.draw();
-      this.say(successMessage(result));
+      this.say(successMessage(result), { undo: true });
     } catch (error) {
       console.error(error);
       this.say(`Erro: ${error.message}`);
+    }
+  }
+
+  /** Volta tudo ao que era antes da última alteração (categorias das transações e regra memorizada). */
+  async undoLast() {
+    if (!this.undo) return;
+    const snapshot = this.undo;
+    this.undo = null;
+    try {
+      const result = await restoreUndoSnapshot(this.db, snapshot);
+      await this.reload();
+      this.draw();
+      this.say(`Alteração desfeita: ${result.transactions} transaç${result.transactions === 1 ? 'ão voltou' : 'ões voltaram'} ao que era${result.rules ? ' e a regra memorizada foi revertida' : ''}.`);
+    } catch (error) {
+      console.error(error);
+      this.say(`Não consegui desfazer: ${error.message}`);
     }
   }
 }

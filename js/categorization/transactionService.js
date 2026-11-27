@@ -98,6 +98,48 @@ export async function confirmSuggestions(db, ids, { remember = false } = {}) {
   return { changed, skipped, rules };
 }
 
+/**
+ * Fotografia (cópia) das transações e das regras, tirada ANTES de uma classificação, para o botão "Desfazer".
+ * Guarda tudo porque uma classificação pode reclassificar outras transações e criar/alterar uma regra memorizada.
+ */
+export async function takeUndoSnapshot(db) {
+  const [transactions, rules] = await Promise.all([db.getAll('transactions'), db.getAll('rules')]);
+  return { transactions: structuredClone(transactions), rules: structuredClone(rules) };
+}
+
+/**
+ * Volta as transações e as regras ao que eram na fotografia (só grava o que realmente mudou, numa única operação).
+ * Regras criadas depois da fotografia são removidas; regras alteradas voltam ao que eram.
+ * @returns {{ transactions:number, rules:number }} quantas transações e regras foram restauradas
+ */
+export async function restoreUndoSnapshot(db, snapshot) {
+  const [txNow, rulesNow] = await Promise.all([db.getAll('transactions'), db.getAll('rules')]);
+  const txById = new Map(txNow.map((t) => [t.id, t]));
+  const ruleById = new Map(rulesNow.map((r) => [r.id, r]));
+  const keepRuleIds = new Set(snapshot.rules.map((r) => r.id));
+  const txToPut = snapshot.transactions.filter((t) => JSON.stringify(txById.get(t.id)) !== JSON.stringify(t));
+  const rulesToDelete = rulesNow.filter((r) => !keepRuleIds.has(r.id));
+  const rulesToPut = snapshot.rules.filter((r) => JSON.stringify(ruleById.get(r.id)) !== JSON.stringify(r));
+  await db.transact(['transactions', 'rules'], ({ transactions, rules }) => {
+    for (const t of txToPut) transactions.put(t);
+    for (const r of rulesToDelete) rules.delete(r.id);
+    for (const r of rulesToPut) rules.put(r);
+  });
+  return { transactions: txToPut.length, rules: rulesToDelete.length + rulesToPut.length };
+}
+
+/** Devolve transações para a Revisão: tira a proteção manual e volta a marcá-las como pendentes (mantém a categoria atual). */
+export async function sendBackToReview(db, ids) {
+  const all = await db.getAll('transactions');
+  const now = new Date().toISOString();
+  const updated = all.filter((t) => ids.includes(t.id)).map((tx) => ({
+    ...tx, manual: false, status: 'pendente', categorySource: 'desconhecido', confidence: 'baixa',
+    reason: 'Devolvida para revisão por você.', suggestedCategoryId: tx.categoryId || tx.suggestedCategoryId || null, categorizedAt: now,
+  }));
+  await saveAll(db, updated);
+  return updated.length;
+}
+
 /** Remove a proteção manual e volta a usar as regras automáticas. */
 export async function resetToAutomatic(db, ids) {
   const all = await db.getAll('transactions');
