@@ -1,0 +1,20 @@
+[
+  { "id": "alimentacao",     "nome": "Alimentação",   "cor": "#f59e0b", "padrao": true },
+  { "id": "transporte",      "nome": "Transporte",    "cor": "#3b82f6", "padrao": true },
+  { "id": "moradia",         "nome": "Moradia",       "cor": "#8b5cf6", "padrao": true },
+  { "id": "compras",         "nome": "Compras",       "cor": "#ec4899", "padrao": true },
+  { "id": "entretenimento",  "nome": "Entretenimento","cor": "#14b8a6", "padrao": true },
+  { "id": "saude",           "nome": "Saúde",         "cor": "#ef4444", "padrao": true },
+  { "id": "assinaturas",     "nome": "Assinaturas",   "cor": "#6366f1", "padrao": true },
+  { "id": "educacao",        "nome": "Educação",      "cor": "#10b981", "padrao": true },
+  { "id": "outros",          "nome": "Outros",        "cor": "#64748b", "padrao": true },
+  { "id": "familia",         "nome": "Família",       "cor": "#d946ef", "padrao": true },
+  { "id": "esporte",         "nome": "Esporte",       "cor": "#65a30d", "padrao": true },
+  { "id": "dizimo",          "nome": "Dízimo",        "cor": "#0ea5e9", "padrao": true },
+  { "id": "pets",            "nome": "Pets",          "cor": "#ea580c", "padrao": true },
+  { "id": "cuidados-pessoais","nome": "Cuidados pessoais","cor": "#e11d48", "padrao": true },
+  { "id": "servicos",        "nome": "Serviços",      "cor": "#0891b2", "padrao": true },
+  { "id": "taxas-tarifas",   "nome": "Taxas e tarifas","cor": "#78716c", "padrao": true },
+  { "id": "presentes",       "nome": "Presentes",     "cor": "#a21caf", "padrao": true },
+  { "id": "viagens",         "nome": "Viagens",       "cor": "#0369a1", "padrao": true }
+]
